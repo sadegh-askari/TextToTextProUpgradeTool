@@ -1,6 +1,10 @@
 {
-  "name": "com.yasirkula.texttotmp",
-  "displayName": "Text To TMP",
+  "name": "com.hexagon.tmptotextpro",
+  "author": {
+    "email": "sm.sadegh.askari@gmail.com",
+    "name": "Sadegh Askari"
+  },
+  "displayName": "TMP To TextPro",
   "version": "1.1.8",
   "documentationUrl": "https://github.com/yasirkula/UnityTextToTextMeshProUpgradeTool",
   "changelogUrl": "https://github.com/yasirkula/UnityTextToTextMeshProUpgradeTool/releases",
