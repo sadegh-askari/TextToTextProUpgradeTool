@@ -3,7 +3,8 @@
     "rootNamespace": "",
     "references": [
         "TextToTMP.Runtime",
-        "Unity.TextMeshPro"
+        "Unity.TextMeshPro",
+        "TextPro"
     ],
     "includePlatforms": [
         "Editor"
