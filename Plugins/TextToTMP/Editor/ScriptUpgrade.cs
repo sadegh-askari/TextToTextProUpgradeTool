@@ -148,14 +148,14 @@ namespace TextToTMPNamespace.Instance{0}";
             "UnityEngine.TextAnchor", "TMPro.TextAlignmentOptions",
             "TextAnchor", "TMPro.TextAlignmentOptions",
 
-            "TMPro.TMP_Text", "YoYo.UI.TextPro",
-            "TMP_Text", "YoYo.UI.TextPro",
+            "TMPro.TMP_Text", "Hexagon.UI.TextPro",
+            "TMP_Text", "Hexagon.UI.TextPro",
             
-            "TMPro.TextMeshProUGUI", "YoYo.UI.TextPro",
-            "TextMeshProUGUI", "YoYo.UI.TextPro",
+            "TMPro.TextMeshProUGUI", "Hexagon.UI.TextPro",
+            "TextMeshProUGUI", "Hexagon.UI.TextPro",
             
-            "TMPro.TextMeshPro", "YoYo.UI.TextPro",
-            "TextMeshPro", "YoYo.UI.TextPro",
+            "TMPro.TextMeshPro", "Hexagon.UI.TextPro3D",
+            "TextMeshPro", "Hexagon.UI.TextPro3D",
         };
 
         private readonly string[] tokenReplacementsWithTMPChecks = new string[]
@@ -511,7 +511,7 @@ namespace TextToTMPNamespace.Instance{0}";
             if (!scriptPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            if (scriptPath.EndsWith("TextPro_TMPro.cs", StringComparison.InvariantCultureIgnoreCase) ||
+            if (scriptPath.EndsWith("TextPro3D.cs", StringComparison.InvariantCultureIgnoreCase) ||
                 scriptPath.EndsWith("TextPro.cs", StringComparison.InvariantCultureIgnoreCase))
                 return;
 

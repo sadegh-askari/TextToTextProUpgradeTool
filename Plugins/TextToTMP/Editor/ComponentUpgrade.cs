@@ -2,6 +2,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using Hexagon.UI;
+using RTLTMPro;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -10,7 +12,6 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-using YoYo.UI;
 using Object = UnityEngine.Object;
 
 namespace TextToTMPNamespace
@@ -52,8 +53,7 @@ namespace TextToTMPNamespace
             int progressCurrent = 0;
             int progressTotal = assetsToUpgrade.EnabledCount + scenesToUpgrade.EnabledCount +
                                 modifiedTextPrefabInstances.Count + modifiedTextMeshPrefabInstances.Count +
-                                modifiedInputFieldPrefabInstances.Count + modifiedDropdownPrefabInstances.Count +
-                                modifiedTextMeshProPrefabInstances.Count;
+                                modifiedInputFieldPrefabInstances.Count + modifiedDropdownPrefabInstances.Count;
             
             try
             {
@@ -97,9 +97,7 @@ namespace TextToTMPNamespace
                             swapIndex = j;
                     }
 
-                    GameObject temp = prefabsToUpgrade[swapIndex];
-                    prefabsToUpgrade[swapIndex] = prefabsToUpgrade[i];
-                    prefabsToUpgrade[i] = temp;
+                    (prefabsToUpgrade[swapIndex], prefabsToUpgrade[i]) = (prefabsToUpgrade[i], prefabsToUpgrade[swapIndex]);
                 }
 #endif
 
@@ -124,9 +122,9 @@ namespace TextToTMPNamespace
                 foreach (TextProperties modifiedPrefabInstance in modifiedTextPrefabInstances)
                     ApplyPrefabInstanceModifications(modifiedPrefabInstance,
                         (tmp) => PasteTextProperties(tmp, modifiedPrefabInstance), ref progressCurrent, progressTotal);
-                foreach (TextMeshProperties modifiedPrefabInstance in modifiedTextMeshPrefabInstances)
+                foreach (TextProperties modifiedPrefabInstance in modifiedTextMeshPrefabInstances)
                     ApplyPrefabInstanceModifications(modifiedPrefabInstance,
-                        (tmp) => PasteTextMeshProperties(tmp, modifiedPrefabInstance), ref progressCurrent,
+                        (tmp) => PasteTextProperties(tmp, modifiedPrefabInstance), ref progressCurrent,
                         progressTotal);
                 foreach (InputFieldProperties modifiedPrefabInstance in modifiedInputFieldPrefabInstances)
                     ApplyPrefabInstanceModifications(modifiedPrefabInstance,
@@ -194,18 +192,13 @@ namespace TextToTMPNamespace
 			if( prefabAssetType != PrefabType.Prefab )
 				return false;
 #endif
-
-            // Check if prefab has any upgradeable components
-            if (prefab.GetComponentInChildren<TextMesh>(true))
-                return true;
             
             if (prefab.GetComponentInChildren<TMP_Text>(true))
                 return true;
 
             foreach (UIBehaviour graphicComponent in prefab.GetComponentsInChildren<UIBehaviour>(true))
             {
-                if (graphicComponent && (graphicComponent is Text || graphicComponent is InputField ||
-                                         graphicComponent is Dropdown))
+                if (graphicComponent && graphicComponent is TMP_InputField or TMP_Dropdown)
                     return true;
             }
 
@@ -296,22 +289,14 @@ namespace TextToTMPNamespace
         {
             try
             {
-                UpgradeDropdown(go.GetComponent<Dropdown>(), prefab ? prefab.GetComponent<Dropdown>() : null);
-                TMP_InputField inputField = UpgradeInputField(go.GetComponent<InputField>(),
-                    prefab ? prefab.GetComponent<InputField>() : null, false);
-                UpgradeText(go.GetComponent<Text>(), prefab ? prefab.GetComponent<Text>() : null);
-                UpgradeTextMesh(go.GetComponent<TextMesh>(), prefab ? prefab.GetComponent<TextMesh>() : null);
-                UpgradeTextMeshPro(go.GetComponent<TMP_Text>());
+                UpgradeDropdown(go.GetComponent<TMP_Dropdown>(), prefab ? prefab.GetComponent<TMP_Dropdown>() : null);
+                UpgradeInputField(go.GetComponent<TMP_InputField>(), prefab ? prefab.GetComponent<TMP_InputField>() : null);
+                UpgradeText(go.GetComponent<TextMeshProUGUI>(), prefab ? prefab.GetComponent<TextMeshProUGUI>() : null);
+                UpgradeTextMesh(go.GetComponent<TextMeshPro>(), prefab ? prefab.GetComponent<TextMeshPro>() : null);
 
                 for (int i = 0; i < go.transform.childCount; i++)
                     UpgradeGameObjectRecursively(go.transform.GetChild(i).gameObject,
                         prefab ? prefab.transform.GetChild(i).gameObject : null);
-
-                // TMP_InputField objects have an extra Viewport (Text Area) child object, create it if necessary. We're creating that Viewport after traversing
-                // the InputField's children because this operation can change some of those children's parents and while traversing hierarchies, we want
-                // transform and prefabTransform to be synchronized
-                if (inputField)
-                    CreateInputFieldViewport(inputField);
             }
             catch (Exception e)
             {
@@ -326,7 +311,7 @@ namespace TextToTMPNamespace
             }
         }
 
-        private TextMeshProUGUI UpgradeText(Text text, Text prefabText)
+        private RTLTextMeshPro UpgradeText(TMP_Text text, TMP_Text prefabText)
         {
             if (!text)
                 return null;
@@ -342,45 +327,43 @@ namespace TextToTMPNamespace
 
             // Replace Text with TextMeshProUGUI
             DestroyImmediate(text, true);
-            TextMeshProUGUI tmp = go.AddComponent<TextMeshProUGUI>();
+            RTLTextMeshPro tmp = go.AddComponent<RTLTextMeshPro>();
 
             // Paste fields
             PasteTextProperties(tmp, properties);
             tmp.rectTransform.sizeDelta = sizeDelta;
 
-            UpgradeTextMeshPro(tmp);
-
             return tmp;
         }
 
-        private TextProperties CopyTextProperties(Text text)
+        private TextProperties CopyTextProperties(TMP_Text text)
         {
-            Material fontMaterial;
-            TMP_FontAsset font = GetCorrespondingTMPFontAsset(text.font, text, out fontMaterial);
+            Material fontMaterial = text.fontSharedMaterial;
+            TMP_FontAsset font = text.font;
 
             return new TextProperties()
             {
                 gameObject = text.gameObject,
-                alignment = GetTMPAlignment(text.alignment, text.alignByGeometry),
-                bestFit = text.resizeTextForBestFit,
-                bestFitMaxSize = text.resizeTextMaxSize,
-                bestFitMinSize = text.resizeTextMinSize,
+                alignment = text.alignment,
+                bestFit = text.enableAutoSizing,
+                bestFitMaxSize = text.fontSizeMax,
+                bestFitMinSize = text.fontSizeMin,
                 color = text.color,
                 enabled = text.enabled,
                 fontMaterial = fontMaterial,
                 font = font,
                 fontSize = text.fontSize,
-                fontStyle = GetTMPFontStyle(text.fontStyle),
-                horizontalWrapMode = text.horizontalOverflow == HorizontalWrapMode.Wrap,
-                lineSpacing = (text.lineSpacing - 1) * 100f,
+                fontStyle = text.fontStyle,
+                horizontalWrapMode =  text.textWrappingMode,
+                lineSpacing = text.lineSpacing,
                 raycastTarget = text.raycastTarget,
-                supportRichText = text.supportRichText,
+                supportRichText = text.richText,
                 text = text.text,
-                verticalOverflow = GetTMPVerticalOverflow(text.verticalOverflow, text.horizontalOverflow)
+                verticalOverflow = text.overflowMode,
             };
         }
 
-        private void PasteTextProperties(TextMeshProUGUI tmp, TextProperties properties)
+        private void PasteTextProperties(TMP_Text tmp, TextProperties properties)
         {
             tmp.alignment = properties.alignment;
             tmp.enableAutoSizing = properties.bestFit;
@@ -393,7 +376,7 @@ namespace TextToTMPNamespace
             tmp.fontSize = properties.fontSize;
             tmp.fontStyle = properties.fontStyle;
 #if TMP_3_2_OR_NEWER
-            tmp.textWrappingMode = properties.horizontalWrapMode ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+            tmp.textWrappingMode = properties.horizontalWrapMode;
 #else
 			tmp.enableWordWrapping = properties.horizontalWrapMode;
 #endif
@@ -404,27 +387,27 @@ namespace TextToTMPNamespace
             tmp.overflowMode = properties.verticalOverflow;
         }
         
-        private TextPro UpgradeTextMeshPro(TMP_Text text)
-        {
-            if (!text)
-                return null;
-            
-            GameObject go = text.gameObject;
-            if (go.TryGetComponent<TextPro>(out _))
-                return null;
-            
-            stringBuilder.Append("Upgrading TextMesh: ").AppendLine(GetPathOfObject(go.transform));
-            
-            //Add TextPro Component
-            TextPro_TMPro tmp = go.AddComponent<TextPro_TMPro>();
+        // private TextPro UpgradeTextMeshProUGUI(TextMeshProUGUI text)
+        // {
+        //     if (!text)
+        //         return null;
+        //     
+        //     GameObject go = text.gameObject;
+        //     if (go.TryGetComponent<TextPro>(out _))
+        //         return null;
+        //     
+        //     stringBuilder.Append("Upgrading TextMesh: ").AppendLine(GetPathOfObject(go.transform));
+        //     
+        //     //Add TextPro Component
+        //     TextPro_TMPro tmp = go.AddComponent<TextPro_TMPro>();
+        //
+        //     // Paste fields
+        //     tmp.text = text.text;
+        //     
+        //     return tmp;
+        // }
 
-            // Paste fields
-            tmp.text = text.text;
-            
-            return tmp;
-        }
-
-        private TextMeshPro UpgradeTextMesh(TextMesh text, TextMesh prefabText)
+        private RTLTextMeshPro3D UpgradeTextMesh(TMP_Text text, TMP_Text prefabText)
         {
             if (!text)
                 return null;
@@ -435,14 +418,14 @@ namespace TextToTMPNamespace
             stringBuilder.Append("Upgrading TextMesh: ").AppendLine(GetPathOfObject(go.transform));
 
             // Copy fields
-            TextMeshProperties properties = CopyTextMeshProperties(text);
+            TextProperties properties = CopyTextProperties(text);
 
             // Replace TextMesh with TextMeshPro
             DestroyImmediate(text, true);
-            TextMeshPro tmp = go.AddComponent<TextMeshPro>();
+            RTLTextMeshPro3D tmp = go.AddComponent<RTLTextMeshPro3D>();
 
             // Paste fields
-            PasteTextMeshProperties(tmp, properties);
+            PasteTextProperties(tmp, properties);
 
 #if TMP_3_2_OR_NEWER
             tmp.textWrappingMode = TextWrappingModes.NoWrap;
@@ -452,32 +435,32 @@ namespace TextToTMPNamespace
             tmp.overflowMode = TextOverflowModes.Overflow;
             tmp.rectTransform.sizeDelta = Vector2.zero;
             
-            UpgradeTextMeshPro(tmp);
+            //UpgradeTextMeshPro(tmp);
 
             return tmp;
         }
 
-        private TextMeshProperties CopyTextMeshProperties(TextMesh text)
-        {
-            Material fontMaterial;
-            TMP_FontAsset font = GetCorrespondingTMPFontAsset(text.font, text, out fontMaterial);
-
-            return new TextMeshProperties()
-            {
-                gameObject = text.gameObject,
-                alignment = GetTMPAlignment(text.anchor, false),
-                characterSize = text.characterSize,
-                color = text.color,
-                fontMaterial = fontMaterial,
-                font = font,
-                fontSize = text.fontSize > 0 ? text.fontSize : 13,
-                fontStyle = GetTMPFontStyle(text.fontStyle),
-                lineSpacing = (text.lineSpacing - 1) * 100f,
-                offsetZ = text.offsetZ,
-                richText = text.richText,
-                text = text.text
-            };
-        }
+        // private TextMeshProperties CopyTextMeshProperties(TextMeshPro text)
+        // {
+        //     Material fontMaterial = text.fontSharedMaterial;
+        //     TMP_FontAsset font = text.font;
+        //
+        //     return new TextMeshProperties()
+        //     {
+        //         gameObject = text.gameObject,
+        //         alignment = text.alignment,
+        //         characterSize = text.characterSize,
+        //         color = text.color,
+        //         fontMaterial = fontMaterial,
+        //         font = font,
+        //         fontSize = text.fontSize > 0 ? text.fontSize : 13,
+        //         fontStyle = GetTMPFontStyle(text.fontStyle),
+        //         lineSpacing = (text.lineSpacing - 1) * 100f,
+        //         offsetZ = text.offsetZ,
+        //         richText = text.richText,
+        //         text = text.text
+        //     };
+        // }
 
         private TextMeshProperties CopyTextMeshProProperties(TMP_Text text)
         {
@@ -516,8 +499,7 @@ namespace TextToTMPNamespace
             tmp.rectTransform.Translate(new Vector3(0f, 0f, properties.offsetZ));
         }
 
-        private TMP_InputField UpgradeInputField(InputField inputField, InputField prefabInputField,
-            bool createViewportImmediately = true)
+        private TMP_InputField UpgradeInputField(TMP_InputField inputField, TMP_InputField prefabInputField)
         {
             if (!inputField)
                 return null;
@@ -526,52 +508,23 @@ namespace TextToTMPNamespace
 
             GameObject go = inputField.gameObject;
             stringBuilder.Append("Upgrading InputField: ").AppendLine(GetPathOfObject(go.transform));
-
-            // Copy fields
-            Vector2 sizeDelta = ((RectTransform)inputField.transform).sizeDelta;
-            InputFieldProperties properties = CopyInputFieldProperties(inputField);
-
+            
             // Upgrade child objects
-            TextMeshProUGUI textComponent = UpgradeText(inputField.textComponent,
+            RTLTextMeshPro textComponent = UpgradeText(inputField.textComponent,
                 prefabInputField ? prefabInputField.textComponent : null);
-            Graphic placeholderComponent = (inputField.placeholder as Text)
-                ? UpgradeText((Text)inputField.placeholder,
-                    prefabInputField ? prefabInputField.placeholder as Text : null)
+            Graphic placeholderComponent = (inputField.placeholder as TMP_Text)
+                ? UpgradeText((TMP_Text)inputField.placeholder,
+                    prefabInputField ? prefabInputField.placeholder as TMP_Text : null)
                 : inputField.placeholder;
 
-            // Apply the changes that TMP_DefaultControls.cs applies by default to new TMP_InputFields
-            if (textComponent) textComponent.extraPadding = true;
-            if (textComponent) textComponent.overflowMode = TextOverflowModes.Overflow;
-            if (placeholderComponent as TextMeshProUGUI) ((TextMeshProUGUI)placeholderComponent).extraPadding = true;
-            if (placeholderComponent && !placeholderComponent.GetComponent<LayoutElement>())
-                placeholderComponent.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+            inputField.textComponent = textComponent;
+            inputField.placeholder = placeholderComponent;
 
-            // Replace InputField with TMP_InputField
-            DestroyImmediate(inputField, true);
-            TMP_InputField tmp = go.AddComponent<TMP_InputField>();
-
-            // Paste fields
-            PasteInputFieldProperties(tmp, properties);
-            ((RectTransform)tmp.transform).sizeDelta = sizeDelta;
-
-            // TMP_InputField objects have an extra Viewport (Text Area) child object, create it if necessary
-            if (createViewportImmediately)
-                CreateInputFieldViewport(tmp);
-
-            return tmp;
+            return inputField;
         }
 
-        private InputFieldProperties CopyInputFieldProperties(InputField inputField)
+        private InputFieldProperties CopyInputFieldProperties(TMP_InputField inputField)
         {
-            Color? caretColor = null;
-            try
-            {
-                caretColor = inputField.caretColor;
-            }
-            catch
-            {
-            }
-
             if (inputFieldOnSubmitField == null)
                 inputFieldOnSubmitField = typeof(InputField).GetField("m_OnSubmit",
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
@@ -587,29 +540,25 @@ namespace TextToTMPNamespace
                 asteriskChar = inputField.asteriskChar,
                 caretBlinkRate = inputField.caretBlinkRate,
                 customCaretColor = inputField.customCaretColor,
-                hasCaretColor = caretColor.HasValue,
-                caretColor = caretColor.GetValueOrDefault(),
+                hasCaretColor = true,
+                caretColor = inputField.caretColor,
                 caretWidth = inputField.caretWidth,
                 characterLimit = inputField.characterLimit,
-                characterValidation = GetTMPCharacterValidation(inputField.characterValidation),
-                contentType = GetTMPContentType(inputField.contentType),
+                characterValidation = inputField.characterValidation,
+                contentType = inputField.contentType,
                 enabled = inputField.enabled,
-                inputType = GetTMPInputType(inputField.inputType),
+                inputType = inputField.inputType,
                 keyboardType = inputField.keyboardType,
-                lineType = GetTMPLineType(inputField.lineType),
+                lineType = inputField.lineType,
                 readOnly = inputField.readOnly,
-                richText = inputField.textComponent
-                    ? inputField.textComponent.supportRichText
-                    : true, // InputField.richText overrides textComponent's Rich Text property so copy that value from the textComponent
+                richText = inputField.richText,
                 selectionColor = inputField.selectionColor,
                 shouldHideMobileInput = inputField.shouldHideMobileInput,
                 text = inputField.text,
 
                 // Copy UnityEvents
                 onEndEdit = CopyUnityEvent(inputField.onEndEdit),
-                onSubmit = (inputFieldOnSubmitField != null)
-                    ? CopyUnityEvent(inputFieldOnSubmitField.GetValue(inputField) as UnityEventBase)
-                    : null,
+                onSubmit = CopyUnityEvent(inputField.onSubmit),
 #if UNITY_5_3_OR_NEWER
                 onValueChanged = CopyUnityEvent(inputField.onValueChanged)
 #else
@@ -684,7 +633,7 @@ namespace TextToTMPNamespace
             }
         }
 
-        private TMP_Dropdown UpgradeDropdown(Dropdown dropdown, Dropdown prefabDropdown)
+        private TMP_Dropdown UpgradeDropdown(TMP_Dropdown dropdown, TMP_Dropdown prefabDropdown)
         {
             if (!dropdown)
                 return null;
@@ -713,7 +662,7 @@ namespace TextToTMPNamespace
             return tmp;
         }
 
-        private DropdownProperties CopyDropdownProperties(Dropdown dropdown)
+        private DropdownProperties CopyDropdownProperties(TMP_Dropdown dropdown)
         {
             return new DropdownProperties()
             {
@@ -727,7 +676,7 @@ namespace TextToTMPNamespace
                 itemImage = dropdown.itemImage,
 
                 enabled = dropdown.enabled,
-                options = GetTMPDropdownOptions(dropdown.options),
+                options = dropdown.options,
                 value = dropdown.value,
 
                 // Copy UnityEvents

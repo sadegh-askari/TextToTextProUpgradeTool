@@ -4,7 +4,8 @@
     "references": [
         "TextToTMP.Runtime",
         "Unity.TextMeshPro",
-        "TextPro"
+        "TextPro",
+        "RTLTMPro"
     ],
     "includePlatforms": [
         "Editor"

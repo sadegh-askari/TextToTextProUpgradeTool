@@ -100,10 +100,10 @@ namespace TextToTMPNamespace
         private List<PendingReferenceUpdate> pendingReferenceUpdates = new List<PendingReferenceUpdate>(1024);
 
         private List<TextProperties> modifiedTextPrefabInstances = new List<TextProperties>(128);
-        private List<TextMeshProperties> modifiedTextMeshPrefabInstances = new List<TextMeshProperties>(128);
+        private List<TextProperties> modifiedTextMeshPrefabInstances = new List<TextProperties>(128);
         private List<InputFieldProperties> modifiedInputFieldPrefabInstances = new List<InputFieldProperties>(128);
         private List<DropdownProperties> modifiedDropdownPrefabInstances = new List<DropdownProperties>(128);
-        private List<TextMeshProperties> modifiedTextMeshProPrefabInstances = new List<TextMeshProperties>(128);
+        //private List<TextMeshProperties> modifiedTextMeshProPrefabInstances = new List<TextMeshProperties>(128);
 
         private List<PrefabInstancesRemovedComponent> removedComponentsInPrefabInstances =
             new List<PrefabInstancesRemovedComponent>(64);
@@ -306,7 +306,7 @@ namespace TextToTMPNamespace
             if ((obj.hideFlags & HideFlags.NotEditable) == HideFlags.NotEditable)
                 return;
 
-            if (obj is Text || obj is InputField || obj is Dropdown || obj is TextMesh || obj is TMP_Text)
+            if (obj is TextMeshProUGUI or TMP_InputField or TMP_Dropdown or TextMeshPro)
             {
                 // Copy the component's properties if it belongs to a prefab instance and it's modified because otherwise, all the modifications will
                 // be lost after upgrading the prefab asset since it will destroy this modified legacy component.
@@ -321,31 +321,17 @@ namespace TextToTMPNamespace
 #else
 				Component prefabComponent = (Component) PrefabUtility.GetPrefabParent( (Component) obj );
 #endif
-                if ((!prefabComponent && (obj is InputField || obj is Dropdown)) || (prefabComponent &&
+                if ((!prefabComponent && obj is TMP_InputField or TMP_Dropdown) || (prefabComponent &&
                         WillUpgradeObject(prefabComponent) && ComponentHasAnyPrefabInstanceModifications(obj)))
                 {
-                    if (obj is Text)
-                        modifiedTextPrefabInstances.Add(CopyTextProperties((Text)obj));
-                    else if (obj is InputField)
-                        modifiedInputFieldPrefabInstances.Add(CopyInputFieldProperties((InputField)obj));
-                    else if (obj is Dropdown)
-                        modifiedDropdownPrefabInstances.Add(CopyDropdownProperties((Dropdown)obj));
-                    else if (obj is TMP_Text)
-                        modifiedTextMeshProPrefabInstances.Add(CopyTextMeshProProperties((TMP_Text)obj));
-                    else if (obj is TextMesh)
-                    {
-                        TextMeshProperties textMeshProperties = CopyTextMeshProperties((TextMesh)obj);
-
-                        if (prefabComponent)
-                        {
-                            // characterSize and offsetZ values aren't present in TextMesh's TMP variant and these values affect the TMP variant's RectTransform.
-                            // We need to make sure that only the difference between this TextMesh and the prefab TextMesh are reflected to these values
-                            textMeshProperties.characterSize /= ((TextMesh)prefabComponent).characterSize;
-                            textMeshProperties.offsetZ -= ((TextMesh)prefabComponent).offsetZ;
-                        }
-
-                        modifiedTextMeshPrefabInstances.Add(textMeshProperties);
-                    }
+                    if (obj is TextMeshProUGUI tmpUGUI)
+                        modifiedTextPrefabInstances.Add(CopyTextProperties(tmpUGUI));
+                    else if (obj is TMP_InputField tmpInputField)
+                        modifiedInputFieldPrefabInstances.Add(CopyInputFieldProperties(tmpInputField));
+                    else if (obj is TMP_Dropdown tmpDropdown)
+                        modifiedDropdownPrefabInstances.Add(CopyDropdownProperties(tmpDropdown));
+                    else if (obj is TextMeshPro tmp3D)
+                        modifiedTextMeshPrefabInstances.Add(CopyTextProperties(tmp3D));
                 }
 
                 return;
@@ -425,53 +411,43 @@ namespace TextToTMPNamespace
                             targetTypes.Add(PendingReferenceUpdate.TargetType.Font);
                             targetPaths.Add(ConvertObjectToReferencePath(value));
                         }
-                        else if (value is Text)
+                        else if (value is TextMeshProUGUI)
                         {
                             if (WillUpgradeObject(value))
                             {
                                 propertyPaths.Add(iterator.propertyPath);
-                                targets.Add(((Text)value).gameObject);
+                                targets.Add(((TextMeshProUGUI)value).gameObject);
                                 targetTypes.Add(PendingReferenceUpdate.TargetType.Text);
                                 targetPaths.Add(ConvertObjectToReferencePath(value));
                             }
                         }
-                        else if (value is InputField)
+                        else if (value is TMP_InputField)
                         {
                             if (WillUpgradeObject(value))
                             {
                                 propertyPaths.Add(iterator.propertyPath);
-                                targets.Add(((InputField)value).gameObject);
+                                targets.Add(((TMP_InputField)value).gameObject);
                                 targetTypes.Add(PendingReferenceUpdate.TargetType.InputField);
                                 targetPaths.Add(ConvertObjectToReferencePath(value));
                             }
                         }
-                        else if (value is Dropdown)
+                        else if (value is TMP_Dropdown)
                         {
                             if (WillUpgradeObject(value))
                             {
                                 propertyPaths.Add(iterator.propertyPath);
-                                targets.Add(((Dropdown)value).gameObject);
+                                targets.Add(((TMP_Dropdown)value).gameObject);
                                 targetTypes.Add(PendingReferenceUpdate.TargetType.Dropdown);
                                 targetPaths.Add(ConvertObjectToReferencePath(value));
                             }
                         }
-                        else if (value is TextMesh)
+                        else if (value is TextMeshPro)
                         {
                             if (WillUpgradeObject(value))
                             {
                                 propertyPaths.Add(iterator.propertyPath);
-                                targets.Add(((TextMesh)value).gameObject);
+                                targets.Add(((TextMeshPro)value).gameObject);
                                 targetTypes.Add(PendingReferenceUpdate.TargetType.TextMesh);
-                                targetPaths.Add(ConvertObjectToReferencePath(value));
-                            }
-                        }
-                        else if (value is TMP_Text)
-                        {
-                            if (WillUpgradeObject(value))
-                            {
-                                propertyPaths.Add(iterator.propertyPath);
-                                targets.Add(((TMP_Text)value).gameObject);
-                                targetTypes.Add(PendingReferenceUpdate.TargetType.TMP_Text);
                                 targetPaths.Add(ConvertObjectToReferencePath(value));
                             }
                         }

@@ -15,19 +15,19 @@ namespace TextToTMPNamespace
 		}
 
 		[Serializable]
-		private class TextProperties : ComponentProperties<Text, TextMeshProUGUI>
+		private class TextProperties : ComponentProperties<Text, TMP_Text>
 		{
 			public TextAlignmentOptions alignment;
 			public bool bestFit;
-			public int bestFitMaxSize;
-			public int bestFitMinSize;
+			public float bestFitMaxSize;
+			public float bestFitMinSize;
 			public Color color;
 			public bool enabled;
 			public Material fontMaterial;
 			public TMP_FontAsset font;
-			public int fontSize;
+			public float fontSize;
 			public FontStyles fontStyle;
-			public bool horizontalWrapMode;
+			public TextWrappingModes horizontalWrapMode;
 			public float lineSpacing;
 			public bool raycastTarget;
 			public bool supportRichText;
